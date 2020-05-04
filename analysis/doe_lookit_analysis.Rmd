@@ -1,0 +1,295 @@
+---
+title: "DOE"
+author: "Shari Liu"
+date: "5/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+# create a function to do this more cleanly
+ipak <- function (pkg) {
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = FALSE)
+  sapply(pkg, require, character.only = TRUE)
+}
+
+packages <- c("schoRsch", "foreign", "lsr", "irr", "vcd", "ggplot2", "lattice", "reshape2", "car", "plyr", "MASS", "lme4", "lmerTest",
+              "effects", "influence.ME", "effsize", "longpower", "multcomp", "lsmeans", "Hmisc", "meta", "tidyr", "dplyr", "psych", "compute.es", "pwr", "lattice", "boot",
+              "cowplot")  # package names go here
+ipak(packages)
+```
+
+
+```{r preprocess}
+# import data
+setwd("/Users/shariliu/Documents/HarvardLDS/Studies/DOE-lookit/analysis/") # change to your local directory!
+doe.wide <- read.csv(file = "doe_data.csv", header = TRUE)
+str(doe.wide)
+names(doe.wide)
+
+# melt data into long format
+doe.long <- doe.wide %>% 
+  gather(trial, look, hab1:test4) %>%
+  mutate(trial_n = parse_number(trial)) %>%
+  mutate(trial_type = str_extract(trial, "[a-z]+"))
+
+doe.long$look <- as.numeric(as.character(doe.long$look))
+doe.long$loglook <- log(doe.long$look)
+
+# section data by dependent measure
+doe.rawl <- doe.long
+#doe.rawl <- dplyr::filter(doe.rawl, type == "high_avg" | type == "low_avg")
+#doe.rawl$type <- factor(doe.rawl$type)
+doe.prop <- dplyr::filter(doe.long, type == "high_prop_avg")
+#doe.bp <- dplyr::filter(doe.long, type == "high1" | type == "high2" |type == "high3" | type == "low1" | type == "low2" | type == "low3")
+#doe.bp$type <- factor(doe.bp$type)
+#doe.bp$loglook <- log(doe.bp$look)
+
+# add test pair info -----------------
+# doe.bp$tp <- rep(NA, nrow(doe.bp))
+# doe.bp$type.new <- rep(NA, nrow(doe.bp))
+# 
+# for (i in 1:nrow(doe.bp)) {
+#   if (doe.bp$type[i] == "high1") {
+#     doe.bp$tp[i] <- "First"
+#     doe.bp$type.new[i] <- "High"
+#   }
+#   else if (doe.bp$type[i] == "low1") {
+#     doe.bp$tp[i] <- "First"
+#     doe.bp$type.new[i] <- "Low"
+#   }
+#   else if (doe.bp$type[i] == "high2") {
+#     doe.bp$tp[i] <- "Second"
+#     doe.bp$type.new[i] <- "High"
+#   }
+#   else if (doe.bp$type[i] == "low2") {
+#     doe.bp$tp[i] <- "Second"
+#     doe.bp$type.new[i] <- "Low"
+#   }
+#   else if (doe.bp$type[i] == "high3") {
+#     doe.bp$tp[i] <- "Third"
+#     doe.bp$type.new[i] <- "High"
+#   }
+#   else if (doe.bp$type[i] == "low3") {
+#     doe.bp$tp[i] <- "Third"
+#     doe.bp$type.new[i] <- "Low"
+#   }
+# }
+# 
+# doe.bp$tp <- factor(doe.bp$tp)
+# doe.bp$type.new <- factor(doe.bp$type.new)
+# levels(doe.rawl$type) <- c("High", "Low")
+
+
+## Retrieved from : http://www.cookbook-r.com/Graphs/Plotting_means_and_error_bars_(ggplot2)/#error-bars-for-within-subjects-variables
+## Gives count, mean, standard deviation, standard error of the mean, and confidence interval (default 95%).
+##   data: a data frame.
+##   measurevar: the name of a column that contains the variable to be summariezed
+##   groupvars: a vector containing names of columns that contain grouping variables
+##   na.rm: a boolean that indicates whether to ignore NA's
+##   conf.interval: the percent range of the confidence interval (default is 95%)
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=TRUE,
+                      conf.interval=.95, .drop=TRUE) {
+  library(plyr)
+  
+  # New version of length which can handle NA's: if na.rm==T, don't count them
+  length2 <- function (x, na.rm=FALSE) {
+    if (na.rm) sum(!is.na(x))
+    else       length(x)
+  }
+  
+  # This does the summary. For each group's data frame, return a vector with
+  # N, mean, and sd
+  datac <- ddply(data, groupvars, .drop=.drop,
+                 .fun = function(xx, col) {
+                   c(N    = length2(xx[[col]], na.rm=na.rm),
+                     mean = mean   (xx[[col]], na.rm=na.rm),
+                     sd   = sd     (xx[[col]], na.rm=na.rm)
+                   )
+                 },
+                 measurevar
+  )
+  
+  # Rename the "mean" column    
+  datac <- plyr::rename(datac, c("mean" = measurevar))
+  
+  datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+  
+  # Confidence interval multiplier for standard error
+  # Calculate t-statistic for confidence interval: 
+  # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+  ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+  datac$ci <- datac$se * ciMult
+  
+  return(datac)
+}
+## Norms the data within specified groups in a data frame; it normalizes each
+## subject (identified by idvar) so that they have the same mean, within each group
+## specified by betweenvars.
+##   data: a data frame.
+##   idvar: the name of a column that identifies each subject (or matched subjects)
+##   measurevar: the name of a column that contains the variable to be summariezed
+##   betweenvars: a vector containing names of columns that are between-subjects variables
+##   na.rm: a boolean that indicates whether to ignore NA's
+normDataWithin <- function(data=NULL, idvar, measurevar, betweenvars=NULL,
+                           na.rm=TRUE, .drop=TRUE) {
+  library(plyr)
+  
+  # Measure var on left, idvar + between vars on right of formula.
+  data.subjMean <- ddply(data, c(idvar, betweenvars), .drop=.drop,
+                         .fun = function(xx, col, na.rm) {
+                           c(subjMean = mean(xx[,col], na.rm=na.rm))
+                         },
+                         measurevar,
+                         na.rm
+  )
+  
+  # Put the subject means with original data
+  data <- merge(data, data.subjMean)
+  
+  # Get the normalized data in a new column
+  measureNormedVar <- paste(measurevar, "_norm", sep="")
+  data[,measureNormedVar] <- data[,measurevar] - data[,"subjMean"] +
+    mean(data[,measurevar], na.rm=na.rm)
+  
+  # Remove this subject mean column
+  data$subjMean <- NULL
+  
+  return(data)
+}
+
+## Summarizes data, handling within-subjects variables by removing inter-subject variability.
+## It will still work if there are no within-S variables.
+## Gives count, un-normed mean, normed mean (with same between-group mean),
+##   standard deviation, standard error of the mean, and confidence interval.
+## If there are within-subject variables, calculate adjusted values using method from Morey (2008).
+##   data: a data frame.
+##   measurevar: the name of a column that contains the variable to be summariezed
+##   betweenvars: a vector containing names of columns that are between-subjects variables
+##   withinvars: a vector containing names of columns that are within-subjects variables
+##   idvar: the name of a column that identifies each subject (or matched subjects)
+##   na.rm: a boolean that indicates whether to ignore NA's
+##   conf.interval: the percent range of the confidence interval (default is 95%)
+summarySEwithin <- function(data=NULL, measurevar, betweenvars=NULL, withinvars=NULL,
+                            idvar=NULL, na.rm=TRUE, conf.interval=.95, .drop=TRUE) {
+  
+  # Ensure that the betweenvars and withinvars are factors
+  factorvars <- vapply(data[, c(betweenvars, withinvars), drop=FALSE],
+                       FUN=is.factor, FUN.VALUE=logical(1))
+  
+  if (!all(factorvars)) {
+    nonfactorvars <- names(factorvars)[!factorvars]
+    message("Automatically converting the following non-factors to factors: ",
+            paste(nonfactorvars, collapse = ", "))
+    data[nonfactorvars] <- lapply(data[nonfactorvars], factor)
+  }
+  
+  # Get the means from the un-normed data
+  datac <- summarySE(data, measurevar, groupvars=c(betweenvars, withinvars),
+                     na.rm=na.rm, conf.interval=conf.interval, .drop=.drop)
+  
+  # Drop all the unused columns (these will be calculated with normed data)
+  datac$sd <- NULL
+  datac$se <- NULL
+  datac$ci <- NULL
+  
+  # Norm each subject's data
+  ndata <- normDataWithin(data, idvar, measurevar, betweenvars, na.rm, .drop=.drop)
+  
+  # This is the name of the new column
+  measurevar_n <- paste(measurevar, "_norm", sep="")
+  
+  # Collapse the normed data - now we can treat between and within vars the same
+  ndatac <- summarySE(ndata, measurevar_n, groupvars=c(betweenvars, withinvars),
+                      na.rm=na.rm, conf.interval=conf.interval, .drop=.drop)
+  
+  # Apply correction from Morey (2008) to the standard error and confidence interval
+  #  Get the product of the number of conditions of within-S variables
+  nWithinGroups    <- prod(vapply(ndatac[,withinvars, drop=FALSE], FUN=nlevels,
+                                  FUN.VALUE=numeric(1)))
+  correctionFactor <- sqrt( nWithinGroups / (nWithinGroups-1) )
+  
+  # Apply the correction factor
+  ndatac$sd <- ndatac$sd * correctionFactor
+  ndatac$se <- ndatac$se * correctionFactor
+  ndatac$ci <- ndatac$ci * correctionFactor
+  
+  # Combine the un-normed means with the normed results
+  merge(datac, ndatac)
+}
+
+## get within-subjects CIs for plotting
+summary.avg <- summarySEwithin(data = doe.rawl, measurevar = "look", betweenvars = c("experiment"), withinvars = "type", idvar = "subj")
+
+
+```
+
+
+```{r habplots}
+habplot1 <- ggplot(data = doe.long, aes(as.factor(trial_n), look, fill=trial_type))
+habplot1 + geom_boxplot() +
+  stat_summary(fun.y=mean,geom="point",shape=5)+
+  stat_summary(fun.data =mean_cl_boot, geom="errorbar",width=0.1)+
+  facet_grid(experiment~trial_type)+
+  ylab("Looking Time (s)")+
+  xlab("Trial")
+
+habplot1 + geom_boxplot() +
+  stat_summary(fun.y=mean,geom="point",shape=5)+
+  stat_summary(fun.data =mean_cl_boot, geom="errorbar",width=0.1)+
+  facet_wrap(~trial_type)+
+  ylab("Looking Time (s)")+
+  xlab("Trial")
+
+doe.wide$high1 <- as.numeric(as.character(doe.wide$high1))
+doe.wide$low1 <- as.numeric(as.character(doe.wide$low1))
+
+
+habplot2 <- ggplot(data=doe.wide, aes(total_hab, high1-low1))
+habplot2 + geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Total Attention During Habituation (s)")
+
+habplot3 <- ggplot(data=doe.wide, aes(n_hab, high1-low1))
+habplot3 + geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Total Number of Habituation Trials")
+
+habplot4 <- ggplot(data=doe.wide, aes(avg_hab, high1-low1))
+habplot4 + geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Average looking time during habituation (per trial)")
+```
+
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
