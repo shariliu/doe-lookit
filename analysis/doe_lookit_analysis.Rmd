@@ -17,9 +17,7 @@ ipak <- function (pkg) {
   sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c("schoRsch", "foreign", "lsr", "irr", "vcd", "ggplot2", "lattice", "reshape2", "car", "plyr", "MASS", "lme4", "lmerTest",
-              "effects", "influence.ME", "effsize", "longpower", "multcomp", "lsmeans", "Hmisc", "meta", "tidyr", "dplyr", "psych", "compute.es", "pwr", "lattice", "boot",
-              "cowplot")  # package names go here
+packages <- c("tidyverse", "cowplot")  # package names go here
 ipak(packages)
 ```
 
@@ -41,10 +39,10 @@ doe.long$look <- as.numeric(as.character(doe.long$look))
 doe.long$loglook <- log(doe.long$look)
 
 # section data by dependent measure
-doe.rawl <- doe.long
+# doe.rawl <- doe.long
 #doe.rawl <- dplyr::filter(doe.rawl, type == "high_avg" | type == "low_avg")
 #doe.rawl$type <- factor(doe.rawl$type)
-doe.prop <- dplyr::filter(doe.long, type == "high_prop_avg")
+# doe.prop <- dplyr::filter(doe.long, type == "high_prop_avg")
 #doe.bp <- dplyr::filter(doe.long, type == "high1" | type == "high2" |type == "high3" | type == "low1" | type == "low2" | type == "low3")
 #doe.bp$type <- factor(doe.bp$type)
 #doe.bp$loglook <- log(doe.bp$look)
@@ -223,12 +221,12 @@ summarySEwithin <- function(data=NULL, measurevar, betweenvars=NULL, withinvars=
 }
 
 ## get within-subjects CIs for plotting
-summary.avg <- summarySEwithin(data = doe.rawl, measurevar = "look", betweenvars = c("experiment"), withinvars = "type", idvar = "subj")
+# summary.avg <- summarySEwithin(data = doe.rawl, measurevar = "look", betweenvars = c("experiment"), withinvars = "type", idvar = "subj")
 
 
 ```
 
-
+# Describing curves of attention during hab and test
 ```{r habplots}
 habplot1 <- ggplot(data = doe.long, aes(as.factor(trial_n), look, fill=trial_type))
 habplot1 + geom_boxplot() +
@@ -248,6 +246,18 @@ habplot1 + geom_boxplot() +
 doe.wide$high1 <- as.numeric(as.character(doe.wide$high1))
 doe.wide$low1 <- as.numeric(as.character(doe.wide$low1))
 
+habplot5 <- ggplot(data=doe.wide, aes(experiment, n_hab, fill=experiment))
+habplot5 + 
+  geom_boxplot() + 
+  geom_point() +
+  stat_summary(fun.data =mean_cl_boot, geom="errorbar",width=0.1)+
+  stat_summary(fun.y=mean,geom="point",shape=5)+
+  ylab("Number of Habituation Trials")
+```
+
+
+# Relating hab data to preference on first test pair
+```{r habplots2}
 
 habplot2 <- ggplot(data=doe.wide, aes(total_hab, high1-low1))
 habplot2 + geom_point() +
@@ -269,27 +279,34 @@ habplot4 + geom_point() +
   geom_smooth(method = "lm")+
   ylab("<-- Pref for low jump ---- Pref for high jump -->")+
   xlab("Average looking time during habituation (per trial)")
+
+
 ```
 
 
+# Relating hab data to preference on first test pair
 
+```{r habplots3}
 
-## R Markdown
+habplot6 <- ggplot(data=doe.wide, aes(total_hab, high_avg-low_avg))
+habplot6 + geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Total Attention During Habituation (s)")
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+habplot7 <- ggplot(data=doe.wide, aes(n_hab, high_avg-low_avg))
+habplot7 + geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Total Number of Habituation Trials")
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+habplot8 <- ggplot(data=doe.wide, aes(avg_hab, high_avg-low_avg))
+habplot8 + geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Average looking time during habituation (per trial)")
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
