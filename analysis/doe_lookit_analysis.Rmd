@@ -279,8 +279,6 @@ habplot4 + geom_point() +
   geom_smooth(method = "lm")+
   ylab("<-- Pref for low jump ---- Pref for high jump -->")+
   xlab("Average looking time during habituation (per trial)")
-
-
 ```
 
 
