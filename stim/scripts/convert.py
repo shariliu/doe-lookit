@@ -2,7 +2,7 @@ import os
 import subprocess as sp
 import sys
 
-videoPath = '/Users/shariliu/Documents/HarvardLDS/Studies/DOE-lookit/stim/mp3/'
+videoPath = '/Users/shariliu/Documents/HarvardLDS/Studies/DOE-lookit/stim/mp4/'
 
 videoFiles = os.listdir(videoPath)
 
