@@ -308,3 +308,32 @@ habplot8 + geom_point() +
   xlab("Average looking time during habituation (per trial)")
 ```
 
+```{r}
+doe.wide$test1 <- as.numeric(as.character(doe.wide$test1))
+doe.wide$test2 <- as.numeric(as.character(doe.wide$test2))
+doe.wide$test3 <- as.numeric(as.character(doe.wide$test4))
+doe.wide$test4 <- as.numeric(as.character(doe.wide$test4))
+
+doe.wide %>%
+  mutate(testsum = test1+test2+test3+test4) %>%
+  ggplot(aes(total_hab,testsum))+
+  geom_point() +
+  geom_smooth(method="lm")+
+  facet_wrap(~experiment)+
+  ylab("Total Looking Time During Test")+
+  xlab("Total Looking Time During Hab")
+
+doe.wide %>%
+  mutate(testsum = test1+test2+test3+test4) %>%
+  ggplot(aes(total_hab,testsum))+
+  geom_point() +
+  geom_smooth(method="lm")+
+  # facet_wrap(~experiment)+
+  ylab("Total Looking Time During Test")+
+  xlab("Total Looking Time During Hab")
+```
+
+```{r}
+
+```
+
