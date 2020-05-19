@@ -17,7 +17,7 @@ ipak <- function (pkg) {
   sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c("tidyverse", "cowplot")  # package names go here
+packages <- c("tidyverse", "cowplot", "lme4", "lmerTest", "patchwork")  # package names go here
 ipak(packages)
 ```
 
@@ -223,6 +223,17 @@ summarySEwithin <- function(data=NULL, measurevar, betweenvars=NULL, withinvars=
 ## get within-subjects CIs for plotting
 # summary.avg <- summarySEwithin(data = doe.rawl, measurevar = "look", betweenvars = c("experiment"), withinvars = "type", idvar = "subj")
 
+doe.wide$test1 <- as.numeric(as.character(doe.wide$test1))
+doe.wide$test2 <- as.numeric(as.character(doe.wide$test2))
+doe.wide$test3 <- as.numeric(as.character(doe.wide$test4))
+doe.wide$test4 <- as.numeric(as.character(doe.wide$test4))
+
+doe.wide$high1 <- as.numeric(as.character(doe.wide$high1))
+doe.wide$high2 <- as.numeric(as.character(doe.wide$high2))
+doe.wide$high3 <- as.numeric(as.character(doe.wide$high3))
+doe.wide$low1 <- as.numeric(as.character(doe.wide$low1))
+doe.wide$low2 <- as.numeric(as.character(doe.wide$low2))
+doe.wide$low3 <- as.numeric(as.character(doe.wide$low3))
 
 ```
 
@@ -279,8 +290,45 @@ habplot4 + geom_point() +
   geom_smooth(method = "lm")+
   ylab("<-- Pref for low jump ---- Pref for high jump -->")+
   xlab("Average looking time during habituation (per trial)")
+
+habplot6 <- ggplot(data=doe.wide, aes(sumhab123, high1-low1))+
+  geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Habituation criterion (hab1+hab2+hab3)")
+
+habplot7 <- ggplot(data=doe.wide, aes(sumhab123, high1-low1))+
+  geom_point() +
+  # facet_wrap(~experiment)+
+  geom_smooth(method = "lm")+
+  ylab("<-- Pref for low jump ---- Pref for high jump -->")+
+  xlab("Habituation criterion (hab1+hab2+hab3)")
+
 ```
 
+```{r}
+habplot8 <- ggplot(data=doe.wide, aes(sumhab123, test1+test2))+
+  geom_point() +
+  # facet_wrap(~experiment)+
+  geom_smooth(method="lm")+
+  ylab("First test pair looking time (test1+test2)")+
+  xlab("Habituation criterion (hab1+hab2+hab3)")
+```
+
+```{r}
+habplot9 <- ggplot(data=doe.wide, aes(sumhab123, test1+test2))+
+  geom_point() +
+  facet_wrap(~experiment)+
+  geom_smooth(method="lm")+
+  ylab("First test pair looking time (test1+test2)")+
+  xlab("Habituation criterion (hab1+hab2+hab3)")
+```
+
+```{r}
+(habplot7 | habplot6) / (habplot8 | habplot9) + plot_annotation(tag_levels = 'A')
+
+```
 
 # Relating hab data to preference on first test pair
 
@@ -309,10 +357,6 @@ habplot8 + geom_point() +
 ```
 
 ```{r}
-doe.wide$test1 <- as.numeric(as.character(doe.wide$test1))
-doe.wide$test2 <- as.numeric(as.character(doe.wide$test2))
-doe.wide$test3 <- as.numeric(as.character(doe.wide$test4))
-doe.wide$test4 <- as.numeric(as.character(doe.wide$test4))
 
 doe.wide %>%
   mutate(testsum = test1+test2+test3+test4) %>%
@@ -335,5 +379,77 @@ doe.wide %>%
 
 ```{r}
 
+```
+
+
+
+# What if infants were only allowed to look x seconds at test?
+
+```{r}
+doe.cutoffs <- doe.wide %>% 
+  mutate(high1.30 = case_when(high1 >= 30 ~ 30,
+                              high1 < 30 ~ high1),
+         high2.30 = case_when(high2 >= 30 ~ 30,
+                              high2 < 30 ~ high2),
+         high3.30 = case_when(high3 >= 30 ~ 30,
+                              high3 < 30 ~ high3),
+         low1.30 = case_when(low1 >= 30 ~ 30,
+                              low1 < 30 ~ low1),
+         low2.30 = case_when(low2 >= 30 ~ 30,
+                              low2 < 30 ~ low2),
+         low3.30 = case_when(low3 >= 30 ~ 30,
+                              low3 < 30 ~ low3)) %>%
+  mutate(high.avg.30 = (high1.30+high2.30+high3.30)/3) %>%
+  mutate(low.avg.30 = (low1.30+low2.30+low3.30)/3) %>%
+  
+  mutate(high1.45 = case_when(high1 >= 45 ~ 45,
+                            high1 < 45 ~ high1),
+       high2.45 = case_when(high2 >= 45 ~ 45,
+                            high2 < 45 ~ high2),
+       high3.45 = case_when(high3 >= 45 ~ 45,
+                            high3 < 45 ~ high3),
+       low1.45 = case_when(low1 >= 45 ~ 45,
+                            low1 < 45 ~ low1),
+       low2.45 = case_when(low2 >= 45 ~ 45,
+                            low2 < 45 ~ low2),
+       low3.45 = case_when(low3 >= 45 ~ 45,
+                            low3 < 45 ~ low3)) %>%
+  mutate(high.avg.45 = (high1.45+high2.45+high3.45)/3) %>%
+  mutate(low.avg.45 = (low1.45+low2.45+low3.45)/3) %>%
+  mutate(high.avg.60 = high_avg) %>%
+  mutate(low.avg.60 = low_avg) %>%
+  gather(trial, look, high.avg.30:low.avg.60)%>%
+  separate(trial, into=c("trialtype", NA, "cutoff")) %>%
+  mutate(loglook = log(look))
+```
+
+```{r}
+cutoffplot1 <- doe.cutoffs %>% filter(!is.na(cutoff)) %>% ggplot(aes(trialtype, look, fill=trialtype)) +
+  geom_boxplot()+
+  geom_point()+
+  stat_summary(fun.y="mean",geom="point", color="white")+
+  stat_summary(fun.data="mean_se",geom="errorbar", width=0.1, color="black")+
+  facet_grid(experiment~cutoff)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position = "none")
+
+cutoffplot2 <- doe.cutoffs %>% filter(is.na(cutoff)) %>% ggplot(aes(trialtype, look, fill=trialtype)) +
+  geom_boxplot()+
+  geom_point()+
+  stat_summary(fun.y="mean",geom="point", color="white")+
+  stat_summary(fun.data="mean_se",geom="errorbar", width=0.1, color="black")+
+  facet_grid(experiment~cutoff)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+(cutoffplot1 | cutoffplot2) + plot_annotation(tag_levels = 'A')
+```
+
+```{r}
+summary(lmer(loglook ~ trialtype + (1|subj), data=doe.cutoffs %>% filter(cutoff==30, experiment=="Exp.1")))
+
+summary(lmer(loglook ~ trialtype + (1|subj), data=doe.cutoffs %>% filter(cutoff==45, experiment=="Exp.1")))
+
+summary(lmer(loglook ~ trialtype + (1|subj), data=doe.cutoffs %>% filter(cutoff==30, experiment=="Exp.3")))
+
+summary(lmer(loglook ~ trialtype + (1|subj), data=doe.cutoffs %>% filter(cutoff==45, experiment=="Exp.3")))
 ```
 
