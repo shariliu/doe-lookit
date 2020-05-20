@@ -8,15 +8,15 @@ videoFiles = os.listdir(videoPath)
 
 for video in videoFiles:
     (shortname, ext) = os.path.splitext(video)
-    if shortname == "eff" or shortname == "ineff" or shortname == "hab": 
-        print(shortname)
+    # if ["control"] in shortname: 
+    print(shortname)
 
-        if ext in ['.mp4']:
+    if ext in ['.mp4']:
 
-            sp.call(['ffmpeg', '-i', os.path.join(videoPath, video), \
-                '-vcodec', 'libvpx', '-acodec', 'libvorbis', os.path.join(videoPath, shortname + '.webm')])
+        sp.call(['ffmpeg', '-i', os.path.join(videoPath, video), \
+            '-vcodec', 'libvpx', '-acodec', 'libvorbis', os.path.join(videoPath, shortname + '.webm')])
 
-        elif ext in ['.mp3']:
+    elif ext in ['.mp3']:
 
-            sp.call(['ffmpeg', '-i', os.path.join(videoPath,video), \
-                os.path.join(videoPath, shortname + '.ogg')])
+        sp.call(['ffmpeg', '-i', os.path.join(videoPath,video), \
+            os.path.join(videoPath, shortname + '.ogg')])
